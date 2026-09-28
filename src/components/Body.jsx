@@ -9,11 +9,20 @@ function Body(props) {
     const [selectedCategory, setSelectedCategory] = useState("All");
     const [searchQuery, setSearchQuery] = useState("");
     const [addedItems, setAddedItems] = useState({});
+    const [loading, setLoading] = useState(true);
+    const [addingState, setAddingState] = useState({});
 
     useEffect(() => {
-        axios.get(`${API_BASE_URL}/products`).then((data) => {
-            setProData(data.data);
-        });
+        setLoading(true);
+        axios.get(`${API_BASE_URL}/products`)
+            .then((data) => {
+                setProData(Array.isArray(data.data) ? data.data : []);
+                setLoading(false);
+            })
+            .catch(() => {
+                setProData([]);
+                setLoading(false);
+            });
     }, []);
 
     async function AddtoCart(id) {
@@ -24,23 +33,33 @@ function Body(props) {
             return;
         }
 
-        const idToken = await user.getIdToken();
+        if (addingState[id]) return;
 
-        axios
-            .post(`${API_BASE_URL}/add/${id}`, null, {
+        setAddingState((prev) => ({ ...prev, [id]: true }));
+
+        try {
+            const idToken = await user.getIdToken();
+
+            const response = await axios.post(`${API_BASE_URL}/add/${id}`, null, {
                 headers: {
                     Authorization: `Bearer ${idToken}`,
                 },
-            })
-            .then((response) => {
-                props.setCartCount(response.data.count);
+            });
 
-                setAddedItems((prev) => ({ ...prev, [id]: true }));
-                setTimeout(() => {
-                    setAddedItems((prev) => ({ ...prev, [id]: false }));
-                }, 1500);
-            })
-            .catch(() => {});
+            if (props.setCartCount && response.data?.count !== undefined) {
+                props.setCartCount(response.data.count);
+            }
+
+            setAddedItems((prev) => ({ ...prev, [id]: true }));
+            setTimeout(() => {
+                setAddedItems((prev) => ({ ...prev, [id]: false }));
+            }, 1500);
+        } catch (err) {
+            console.error("Add to cart error:", err);
+            alert("Failed to add product to cart: " + (err.response?.data?.message || err.message));
+        } finally {
+            setAddingState((prev) => ({ ...prev, [id]: false }));
+        }
     }
 
     // Only extract categories that actually exist in the MongoDB products
@@ -128,7 +147,16 @@ function Body(props) {
 
             {/* Products Grid */}
             <div className="max-w-7xl mx-auto px-4 sm:px-6 pb-16">
-                {filteredProducts.length === 0 ? (
+                {loading ? (
+                    <div className="bg-white rounded-3xl p-12 text-center shadow-sm border border-[#ede7dc] max-w-md mx-auto flex flex-col items-center justify-center gap-3">
+                        <svg className="animate-spin h-8 w-8 text-[#174f55]" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <p className="text-[#173e43] font-bold text-base">Loading products...</p>
+                        <p className="text-gray-400 text-xs">Please wait a moment while we fetch items from the server.</p>
+                    </div>
+                ) : filteredProducts.length === 0 ? (
                     <div className="bg-white rounded-3xl p-12 text-center shadow-sm border border-[#ede7dc] max-w-md mx-auto">
                         <p className="text-gray-500 font-semibold text-sm">No products found matching your search.</p>
                     </div>
@@ -189,14 +217,25 @@ function Body(props) {
                                     </div>
                                     <button
                                         type="button"
+                                        disabled={addingState[item._id]}
                                         onClick={() => AddtoCart(item._id)}
                                         className={`w-full py-2.5 rounded-xl font-bold text-xs sm:text-sm shadow-sm transition flex items-center justify-center gap-2 ${
                                             addedItems[item._id]
-                                                ? "bg-emerald-600 hover:bg-emerald-700 text-white"
-                                                : "bg-[#ee8568] hover:bg-[#e67556] text-white"
+                                                ? "bg-emerald-600 hover:bg-emerald-700 text-white cursor-default"
+                                                : addingState[item._id]
+                                                ? "bg-[#ee8568]/80 text-white cursor-not-allowed opacity-80"
+                                                : "bg-[#ee8568] hover:bg-[#e67556] text-white cursor-pointer"
                                         }`}
                                     >
-                                        {addedItems[item._id] ? (
+                                        {addingState[item._id] ? (
+                                            <>
+                                                <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                </svg>
+                                                <span>Adding...</span>
+                                            </>
+                                        ) : addedItems[item._id] ? (
                                             <>
                                                 <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
                                                     <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />

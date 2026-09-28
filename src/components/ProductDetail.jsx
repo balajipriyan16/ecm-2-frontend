@@ -9,6 +9,7 @@ function ProductDetail({ setCartCount }) {
     const [product, setProduct] = useState(null);
     const [quantity, setQuantity] = useState(1);
     const [loading, setLoading] = useState(true);
+    const [adding, setAdding] = useState(false);
     const [addedToCart, setAddedToCart] = useState(false);
 
     useEffect(() => {
@@ -31,6 +32,9 @@ function ProductDetail({ setCartCount }) {
             return false;
         }
 
+        if (adding) return false;
+
+        setAdding(true);
         try {
             const idToken = await user.getIdToken();
 
@@ -56,7 +60,11 @@ function ProductDetail({ setCartCount }) {
             }, 1500);
             return true;
         } catch (error) {
+            console.error("Add to cart error:", error);
+            alert("Failed to add to cart: " + (error.response?.data?.message || error.message));
             return false;
+        } finally {
+            setAdding(false);
         }
     }
 
@@ -184,14 +192,25 @@ function ProductDetail({ setCartCount }) {
                             <div className="flex flex-col sm:flex-row gap-3 pt-4">
                                 <button
                                     type="button"
+                                    disabled={adding}
                                     onClick={handleAddToCart}
                                     className={`flex-1 py-3.5 px-5 rounded-xl font-bold text-sm shadow-md transition flex items-center justify-center gap-2 ${
                                         addedToCart
-                                            ? "bg-emerald-600 text-white"
-                                            : "bg-[#ee8568] hover:bg-[#e67556] text-white"
+                                            ? "bg-emerald-600 text-white cursor-default"
+                                            : adding
+                                            ? "bg-[#ee8568]/80 text-white cursor-not-allowed opacity-80"
+                                            : "bg-[#ee8568] hover:bg-[#e67556] text-white cursor-pointer"
                                     }`}
                                 >
-                                    {addedToCart ? (
+                                    {adding ? (
+                                        <>
+                                            <svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            <span>Adding...</span>
+                                        </>
+                                    ) : addedToCart ? (
                                         <>
                                             <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
                                                 <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
@@ -210,8 +229,9 @@ function ProductDetail({ setCartCount }) {
 
                                 <button
                                     type="button"
+                                    disabled={adding}
                                     onClick={handleBuyNow}
-                                    className="flex-1 bg-[#174f55] hover:bg-[#113a3f] text-white py-3.5 px-5 rounded-xl font-bold text-sm shadow-md transition flex items-center justify-center gap-2"
+                                    className="flex-1 bg-[#174f55] hover:bg-[#113a3f] text-white py-3.5 px-5 rounded-xl font-bold text-sm shadow-md transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                                 >
                                     <span>Buy Now</span>
                                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
